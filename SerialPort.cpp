@@ -42,6 +42,7 @@ const uint8_t MMDVM_DSTAR_DATA   = 0x11U;
 const uint8_t MMDVM_DSTAR_LOST   = 0x12U;
 const uint8_t MMDVM_DSTAR_EOT    = 0x13U;
 
+const uint8_t MMDVM_DMR_ALOHA    = 0x17U;
 const uint8_t MMDVM_DMR_DATA1    = 0x18U;
 const uint8_t MMDVM_DMR_LOST1    = 0x19U;
 const uint8_t MMDVM_DMR_DATA2    = 0x1AU;
@@ -278,6 +279,10 @@ uint8_t CSerialPort::setConfig(const uint8_t* data, uint8_t length)
   if (modemState == STATE_M17 && !m17Enable)
     return 4U;
 
+  bool trunking = (data[25U] & 128U) == 128U;
+  bool control_channel = (data[25U] & 64U) == 64U;
+  bool registration_required = (data[25U] & 32U) == 32U;
+  
   uint8_t colorCode = data[6U];
   if (colorCode > 15U)
     return 4U;
@@ -349,6 +354,7 @@ uint8_t CSerialPort::setConfig(const uint8_t* data, uint8_t length)
   dmrDMOTX.setTXDelay(txDelay);
 
 #if defined(DUPLEX)
+  dmrTX.setTrunking(trunking);
   dmrTX.setColorCode(colorCode);
   dmrRX.setColorCode(colorCode);
   dmrRX.setDelay(dmrDelay);
@@ -799,6 +805,17 @@ void CSerialPort::process()
             }
           #endif
             break;
+          
+          case MMDVM_DMR_ALOHA:
+          #if defined(DUPLEX)
+            if (m_dmrEnable)
+              err = dmrTX.writeAloha(m_buffer + 3U, m_len - 3U);
+            if (err != 0U) {
+              DEBUG2("Received invalid DMR Short LC", err);
+              sendNAK(err);
+            }
+          #endif
+          break;
 
           case MMDVM_DMR_ABORT:
           #if defined(DUPLEX)

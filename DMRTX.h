@@ -45,10 +45,12 @@ public:
   uint8_t writeData1(const uint8_t* data, uint8_t length);
   uint8_t writeData2(const uint8_t* data, uint8_t length);
 
+  uint8_t writeAloha(const uint8_t* data, uint8_t length);
   uint8_t writeShortLC(const uint8_t* data, uint8_t length);
   uint8_t writeAbort(const uint8_t* data, uint8_t length);
 
   void setStart(bool start);
+  void setTrunking(bool trunking);
 
   void process();
 
@@ -61,6 +63,7 @@ private:
   CSerialRB                        m_fifo[2U];
   DMRTXSTATE                       m_state;
   uint8_t                          m_idle[DMR_FRAME_LENGTH_BYTES];
+  uint8_t                          m_aloha[DMR_FRAME_LENGTH_BYTES];
   uint8_t                          m_cachPtr;
   uint8_t                          m_shortLC[12U];
   uint8_t                          m_newShortLC[12U];
@@ -71,6 +74,8 @@ private:
   uint32_t                         m_frameCount;
   bool                             m_abort[2U];
   uint8_t                          m_control_old;
+  bool                             m_controlChannel;
+  bool                             m_trunking;
 
   void createData(uint8_t slotIndex);
   void createCACH(uint8_t txSlotIndex, uint8_t rxSlotIndex);

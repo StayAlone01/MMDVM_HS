@@ -31,6 +31,11 @@ const uint8_t IDLE_DATA[] =
          0x36U, 0x00U, 0x0DU, 0xFFU, 0x57U, 0xD7U, 0x5DU, 0xF5U, 0xD0U, 0x03U, 0xF6U,
          0xE4U, 0x65U, 0x17U, 0x1BU, 0x48U, 0xCAU, 0x6DU, 0x4FU, 0xC6U, 0x10U, 0xB4U};
 
+const uint8_t TERMINATOR_DATA[] =
+        {0x00U, 0xCCU, 0x01U, 0x80U, 0x01U, 0x94U, 0x01U, 0x48U, 0x08U, 0xB0U, 0x08U,
+         0x80U, 0x04U, 0xADU, 0xFFU, 0x57U, 0xD7U, 0x5DU, 0xF5U, 0xD9U, 0x65U, 0x90U,
+         0x01U, 0x78U, 0x00U, 0xD0U, 0x08U, 0x40U, 0x14U, 0x00U, 0x0DU, 0x80U, 0x15U};
+
 const uint8_t CACH_INTERLEAVE[] =
         { 1U,  2U,  3U,  5U,  6U,  7U,  9U, 10U, 11U, 13U, 15U, 16U, 17U, 19U, 20U, 21U, 23U,
          25U, 26U, 27U, 29U, 30U, 31U, 33U, 34U, 35U, 37U, 39U, 40U, 41U, 43U, 44U, 45U, 47U,
@@ -51,6 +56,7 @@ CDMRTX::CDMRTX() :
 m_fifo(),
 m_state(DMRTXSTATE_IDLE),
 m_idle(),
+m_aloha(),
 m_cachPtr(0U),
 m_shortLC(),
 m_newShortLC(),
@@ -60,7 +66,9 @@ m_poLen(0U),
 m_poPtr(0U),
 m_frameCount(0U),
 m_abort(),
-m_control_old(0U)
+m_control_old(0U),
+m_controlChannel(false),
+m_trunking(false)
 {
   ::memcpy(m_newShortLC, EMPTY_SHORT_LC, 12U);
   ::memcpy(m_shortLC,    EMPTY_SHORT_LC, 12U);
@@ -170,6 +178,15 @@ uint8_t CDMRTX::writeData2(const uint8_t* data, uint8_t length)
   return 0U;
 }
 
+uint8_t CDMRTX::writeAloha(const uint8_t* data, uint16_t length)
+{
+    if (length != (DMR_FRAME_LENGTH_BYTES + 1U))
+        return 4U;
+    ::memcpy(m_aloha, data, length);
+    m_controlChannel = true;
+    return 0U;
+}
+
 uint8_t CDMRTX::writeShortLC(const uint8_t* data, uint8_t length)
 {
   if (length != 9U)
@@ -208,6 +225,12 @@ uint8_t CDMRTX::writeAbort(const uint8_t* data, uint8_t length)
 void CDMRTX::setStart(bool start)
 {
   m_state = start ? DMRTXSTATE_SLOT1 : DMRTXSTATE_IDLE;
+
+  if (!start){
+    m_poLen = 0U;
+    m_poPtr = 0U;
+    io.reset();
+  }
 
   m_frameCount = 0U;
 
@@ -264,7 +287,12 @@ void CDMRTX::createData(uint8_t slotIndex)
     m_abort[slotIndex] = false;
     // Transmit an idle message
     for (unsigned int i = 0U; i < DMR_FRAME_LENGTH_BYTES; i++) {
-      m_poBuffer[i]   = m_idle[i];
+
+      if (slotIndex == 0 && m_controlChannel && m_trunking)
+        m_poBuffer[i]   = m_aloha[i];
+      else
+        m_poBuffer[i]   = m_idle[i];
+      
       if (i == 8U)
         m_markBuffer[i] = slotIndex == 0U ? MARK_SLOT1 : MARK_SLOT2;
       else
@@ -284,7 +312,7 @@ void CDMRTX::createCACH(uint8_t txSlotIndex, uint8_t rxSlotIndex)
     m_cachPtr = 0U;
 
   if (m_cachPtr == 0U) {
-    if (m_fifo[0U].getData() == 0U && m_fifo[1U].getData() == 0U)
+    if (m_fifo[0U].getData() == 0U && m_fifo[1U].getData() == 0U && !m_trunking)
       ::memcpy(m_shortLC, EMPTY_SHORT_LC, 12U);
     else
       ::memcpy(m_shortLC, m_newShortLC, 12U);
@@ -327,10 +355,22 @@ void CDMRTX::createCACH(uint8_t txSlotIndex, uint8_t rxSlotIndex)
 
 void CDMRTX::setColorCode(uint8_t colorCode)
 {
-  ::memcpy(m_idle, IDLE_DATA, DMR_FRAME_LENGTH_BYTES);
-
   CDMRSlotType slotType;
-  slotType.encode(colorCode, DT_IDLE, m_idle);
+  if (m_trunking)
+  {
+    ::memcpy(m_aloha, TERMINATOR_DATA, DMR_FRAME_LENGTH_BYTES);
+    slotType.encode(colorCode, DT_ALOHA, m_aloha);
+  }
+  else
+  {
+    ::memcpy(m_idle, IDLE_DATA, DMR_FRAME_LENGTH_BYTES);
+    slotType.encode(colorCode, DT_IDLE, m_idle);
+  }
+}
+
+void CDMRTX::setTrunking(bool trunking)
+{
+    m_trunking = trunking;
 }
 
 #endif
