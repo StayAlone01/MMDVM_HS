@@ -308,6 +308,15 @@ uint16_t CIO::getSpace() const
   return m_txBuffer.getSpace();
 }
 
+void CIO::resetTXBuf()
+{
+  uint8_t bit;
+  uint8_t control;
+  while (m_txBuffer.get(bit, control)) {
+    // Discard all bits in the TX buffer
+  }
+}
+
 bool CIO::hasTXOverflow()
 {
   return m_txBuffer.hasOverflowed();
