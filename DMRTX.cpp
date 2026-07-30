@@ -359,13 +359,14 @@ void CDMRTX::setColorCode(uint8_t colorCode)
   if (m_trunking)
   {
     ::memcpy(m_aloha, TERMINATOR_DATA, DMR_FRAME_LENGTH_BYTES);
-    slotType.encode(colorCode, DT_ALOHA, m_aloha);
+    slotType.encode(colorCode, DT_TERMINATOR_WITH_LC, m_idle);
   }
   else
   {
     ::memcpy(m_idle, IDLE_DATA, DMR_FRAME_LENGTH_BYTES);
     slotType.encode(colorCode, DT_IDLE, m_idle);
   }
+  slotType.encode(colorCode, DT_CSBK, m_aloha);
 }
 
 void CDMRTX::setTrunking(bool trunking)
