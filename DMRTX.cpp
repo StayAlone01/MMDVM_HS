@@ -178,7 +178,7 @@ uint8_t CDMRTX::writeData2(const uint8_t* data, uint8_t length)
   return 0U;
 }
 
-uint8_t CDMRTX::writeAloha(const uint8_t* data, uint16_t length)
+uint8_t CDMRTX::writeAloha(const uint8_t* data, uint8_t length)
 {
     if (length != (DMR_FRAME_LENGTH_BYTES + 1U))
         return 4U;
